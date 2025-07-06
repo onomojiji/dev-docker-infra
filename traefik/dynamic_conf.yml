@@ -1,0 +1,17 @@
+# 📁 traefik/dynamic_conf.yml
+# Configuration dynamique : règles de routage et services exposés.
+http:
+  routers:
+    grafana-router:
+      rule: "Host(`grafana.localhost`)"
+      service: grafana-service
+      entryPoints:
+        - web
+
+  services:
+    grafana-service:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+
+# ➕ Tu peux ajouter d'autres routers/services ici pour pgadmin.localhost, odoo.localhost, etc.

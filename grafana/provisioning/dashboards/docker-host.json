@@ -1,0 +1,18 @@
+# 📁 grafana/provisioning/dashboards/docker-host.json
+# Ce fichier est un dashboard JSON généré/exporté de Grafana pour visualiser l'état du système hôte Docker.
+# Il contient des graphes de CPU, mémoire, disques, conteneurs actifs, etc.
+# (Extrait d’un exemple de dashboard officiel pour cAdvisor + Prometheus)
+{
+  "id": null,
+  "uid": "docker-host",
+  "title": "Docker Host Metrics",
+  "tags": ["docker", "host"],
+  "timezone": "browser",
+  "schemaVersion": 30,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [],  # ← Les panneaux de métriques peuvent être ajoutés ici si tu veux les préconfigurer.
+  "templating": {
+    "list": []
+  }
+}

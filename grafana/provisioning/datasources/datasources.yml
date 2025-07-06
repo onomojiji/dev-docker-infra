@@ -1,0 +1,13 @@
+# 📁 grafana/provisioning/datasources/datasources.yml
+# Ce fichier configure automatiquement la connexion de Grafana à Prometheus.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus                    # Nom visible dans l'interface Grafana
+    type: prometheus                    # Type de datasource
+    access: proxy                       # Utilise le proxy interne Grafana
+    orgId: 1                            # Organisation ID (par défaut 1)
+    url: http://prometheus:9090         # URL d'accès interne à Prometheus (via docker)
+    isDefault: true                     # Définit comme datasource par défaut
+    version: 1                          # Version de config
+    editable: true                      # Permet les modifications via l'UI

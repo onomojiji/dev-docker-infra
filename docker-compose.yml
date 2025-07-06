@@ -1,0 +1,241 @@
+# Début de la section où sont listés tous les services (conteneurs) que compose votre infrastructure.
+services:
+
+  # 🔵 Service PostgreSQL — Base de données relationnelle
+  postgres:
+    image: postgres:15  # Image officielle PostgreSQL version 15
+    container_name: infra-postgres  # Nom du conteneur dans Docker
+    restart: always  # Redémarre automatiquement si le conteneur s'arrête
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}  # Nom d'utilisateur défini dans .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Mot de passe défini dans .env
+      #POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Sauvegarde des données sur le disque
+    ports:
+      - "5432:5432"  # Port d'écoute par défaut de PostgreSQL
+    networks:
+      - infra-net
+
+  # 🟢 Service pgAdmin — Interface web pour gérer PostgreSQL plus facilement, comme phpMyAdmin pour MySQL.
+  pgadmin:
+    image: dpage/pgadmin4  # Image officielle de pgAdmin
+    container_name: infra-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}  # Email admin
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}  # Mot de passe admin
+    ports:
+      - "5050:80"  # Accès à l'interface pgAdmin via http://localhost:5050
+    depends_on:
+      - postgres  # Attente que PostgreSQL soit prêt
+    networks:
+      - infra-net
+
+  # 🟡 Service Odoo — ERP complet
+  odoo:
+    image: odoo:18
+    container_name: infra-odoo
+    depends_on:
+      - postgres
+    environment:
+      - HOST=postgres
+      - USER=${POSTGRES_USER}
+      - PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "8069:8069"  # Interface web Odoo http://localhost:8069
+    volumes:
+      - odoo_addons:/mnt/extra-addons
+      - odoo_data:/var/lib/odoo
+      - ./odoo/odoo.conf:/etc/odoo/odoo.conf  # ← on monte le fichier de config
+    command: ["odoo", "-c", "/etc/odoo/odoo.conf"]  # ← on le force au démarrage
+    networks:
+      - infra-net
+
+  # 📧 MailDev — Outil de test SMTP
+  maildev:
+    image: maildev/maildev
+    container_name: infra-maildev
+    ports:
+      - "1080:1080"  # Interface web pour voir les mails envoyés
+      - "1025:1025"  # Port SMTP d'envoi
+    networks:
+      - infra-net
+
+  # 🔴 Redis — Système de cache en mémoire rapide
+  redis:
+    image: redis:alpine
+    container_name: infra-redis
+    restart: always
+    ports:
+      - "6379:6379"  # Port d’accès Redis
+    networks:
+      - infra-net
+
+  # 🧩 Adminer — Interface légère de gestion de bases de données
+  adminer:
+    image: adminer
+    container_name: infra-adminer
+    restart: always
+    ports:
+      - "8080:8080"  # Accès via http://localhost:8080
+    networks:
+      - infra-net
+
+  # 🖥️ Portainer — Gestion des conteneurs via une interface web
+  portainer:
+    image: portainer/portainer-ce
+    container_name: infra-portainer
+    restart: always
+    ports:
+      - "9000:9000"  # Interface Portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Nécessaire pour contrôler Docker
+      - portainer_data:/data
+    networks:
+      - infra-net
+
+  # 📂 MinIO — Stockage objet compatible S3
+  minio:
+    image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    container_name: infra-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9001:9001"  # Interface d’administration
+      - "9002:9000"  # API S3 compatible
+    volumes:
+      - minio_data:/data
+    networks:
+      - infra-net
+
+  # Client MinIO pour créer le bucket automatiquement
+  minio-client:
+      image: minio/mc:latest
+      container_name: infra-minio-client
+      depends_on:
+          - minio
+      entrypoint: >
+          /bin/sh -c "
+          sleep 15;
+          /usr/bin/mc alias set minio http://minio:9000 minioadmin minioadmin123;
+          /usr/bin/mc mb minio/infra-bucket --ignore-existing;
+          /usr/bin/mc policy set public minio/infra-bucket;
+          /usr/bin/mc anonymous set public minio/infra-bucket;
+          echo 'Bucket policy applied successfully';
+          exit 0;
+          "
+      networks:
+          - infra-net
+      restart:
+          always
+
+  # 🔍 Elasticsearch — Moteur de recherche et d’analyse
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: infra-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false  # Désactive la sécurité (dev uniquement)
+    ports:
+      - "9200:9200"  # Port d’API Elasticsearch
+    networks:
+      - infra-net
+
+  # 📊 Kibana — Interface d’exploration des données Elasticsearch
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: infra-kibana
+    ports:
+      - "5601:5601"  # Interface Web
+    environment:
+      ELASTICSEARCH_HOSTS: "http://infra-elasticsearch:9200"
+    depends_on:
+      - elasticsearch
+    networks:
+      - infra-net
+
+  # ✉️ RabbitMQ — Système de messagerie asynchrone
+  rabbitmq:
+    image: rabbitmq:3-management  # Interface web incluse (port 15672)
+    container_name: infra-rabbitmq
+    ports:
+      - "5672:5672"   # Protocole AMQP (pour que les services communiquent)
+      - "15672:15672" # Interface Web http://localhost:15672
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - infra-net
+
+  # 🔁 Service Traefik — Reverse Proxy dynamique avec HTTPS Let's Encrypt
+  traefik:
+    image: traefik:v2.11
+    container_name: infra-traefik
+    restart: always
+    command:
+      - --api.dashboard=true                          # Active l'interface web du dashboard Traefik
+      - --providers.docker=true                       # Active le provider Docker (traefik lit les conteneurs)
+      - --providers.docker.exposedByDefault=false    # N'expose que les conteneurs ayant le label traefik.enable=true
+      - --entrypoints.web.address=:80                # Entrée HTTP
+      - --entrypoints.websecure.address=:443         # Entrée HTTPS
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=admin@example.com
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"      # HTTP public
+      - "443:443"    # HTTPS public
+      - "8088:8080"  # Dashboard Traefik via http://localhost:8088/dashboard/
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock    # Nécessaire pour détecter automatiquement les conteneurs
+      - ./traefik:/etc/traefik                        # Contient les fichiers traefik.yml et dynamic_conf.yml
+      - traefik_letsencrypt:/letsencrypt     # Stockage persistant des certificats Let's Encrypt
+    networks:
+      - infra-net
+
+
+# 🌐 Réseau utilisé pour connecter tous les conteneurs entre eux
+networks:
+  infra-net:
+    driver: bridge
+
+# 💾 Définition des volumes pour persister les données
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/postgres_data
+      o: bind
+  odoo_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/odoo_data
+      o: bind
+  odoo_addons:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/odoo_addons
+      o: bind
+  portainer_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/portainer_data
+      o: bind
+  minio_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/minio_data
+      o: bind
+  traefik_letsencrypt:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/traefik_letsencrypt
+      o: bind

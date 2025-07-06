@@ -1,0 +1,11 @@
+setup:
+	bash detect_ip.sh
+	docker compose --env-file .env up -d
+
+clean:
+	docker compose down
+	rm -rf ./docker/volumes
+	rm -f .env
+
+logs:
+	docker compose logs -f

@@ -1,0 +1,31 @@
+# 📁 Arborescence des fichiers recommandée pour ton infrastructure
+
+infra/
+├── .env                         # Variables d'environnement (accès, users, passwords, IP)
+├── docker-compose.yml          # Configuration complète des services
+├── create-volumes.sh           # Script shell pour créer tous les volumes
+├── detect_ip.sh                # Script pour détecter l'IP de la machine hôte
+├── infra_install.sh            # Script principal pour tout installer (volumes + compose)
+├── README.md                   # Documentation complète des services et usages
+│
+├── prometheus/
+│   └── prometheus.yml          # Fichier de configuration de Prometheus (targets + scrape configs)
+│
+├── grafana/
+│   └── provisioning/
+│       ├── datasources/
+│       │   └── datasources.yml       # Configuration des connexions Grafana (Prometheus...)
+│       └── dashboards/
+│           └── docker-host.json     # Dashboard JSON pour Docker/host metrics
+│
+├── traefik/
+│   ├── traefik.yml             # Configuration statique Traefik
+│   └── dynamic_conf.yml        # Configuration dynamique (routes, services...)
+│
+└── docker/
+    └── volumes/                # Dossier contenant les volumes bindés
+        ├── postgres_data/
+        ├── odoo_data/
+        ├── odoo_addons/
+        ├── portainer_data/
+        └── minio_data/
