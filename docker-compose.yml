@@ -36,6 +36,7 @@ services:
   odoo:
     image: odoo:18
     container_name: infra-odoo
+    restart: always
     depends_on:
       - postgres
     environment:
@@ -55,6 +56,7 @@ services:
   # 📧 MailDev — Outil de test SMTP
   maildev:
     image: maildev/maildev
+    restart: always
     container_name: infra-maildev
     ports:
       - "1080:1080"  # Interface web pour voir les mails envoyés
@@ -98,6 +100,7 @@ services:
   # 📂 MinIO — Stockage objet compatible S3
   minio:
     image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    restart: always
     container_name: infra-minio
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -148,6 +151,7 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: infra-kibana
+    restart: always
     ports:
       - "5601:5601"  # Interface Web
     environment:
@@ -161,6 +165,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management  # Interface web incluse (port 15672)
     container_name: infra-rabbitmq
+    restart: always
     ports:
       - "5672:5672"   # Protocole AMQP (pour que les services communiquent)
       - "15672:15672" # Interface Web http://localhost:15672
@@ -192,6 +197,136 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock    # Nécessaire pour détecter automatiquement les conteneurs
       - ./traefik:/etc/traefik                        # Contient les fichiers traefik.yml et dynamic_conf.yml
       - traefik_letsencrypt:/letsencrypt     # Stockage persistant des certificats Let's Encrypt
+    networks:
+      - infra-net
+
+  # ⚙️ Service Jenkins — Intégration Continue (CI/CD)
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: infra-jenkins
+    restart: always
+    user: root  # Nécessaire pour installer des plugins et accéder à /var/jenkins_home
+    ports:
+      - "8081:8080"  # Interface web de Jenkins : http://localhost:8081
+      - "50000:50000"  # Port d'écoute des agents Jenkins (slaves)
+    volumes:
+      - jenkins_home:/var/jenkins_home  # Stockage persistant des jobs, plugins, config
+      - /var/run/docker.sock:/var/run/docker.sock         # Permet à Jenkins de lancer des conteneurs Docker
+    networks:
+      - infra-net
+
+  mongodb:
+    image: mongo:7
+    container_name: infra-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}  # Identifiant admin MongoDB
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}  # Mot de passe admin MongoDB
+    volumes:
+      - mongodb_data:/data/db  # Volume persistant des données MongoDB
+    ports:
+      - "27017:27017"  # Port standard MongoDB
+    networks:
+      - infra-net
+
+    # 🍃 Deuxième instance MongoDB — version 5 pour compatibilité avec anciens projets
+  mongodb5:
+    image: mongo:5
+    container_name: infra-mongodb5
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO5_INITDB_ROOT_USERNAME}  # Identifiant admin MongoDB 5
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO5_INITDB_ROOT_PASSWORD}  # Mot de passe admin MongoDB 5
+    volumes:
+      - mongodb5_data:/data/db  # Volume persistant MongoDB 5
+    ports:
+      - "27018:27017"  # On mappe sur 27018 pour éviter conflit avec mongodb7
+    networks:
+      - infra-net
+
+  # 📊 MongoDB Exporter — pour exporter les métriques vers Prometheus
+  mongodb_exporter:
+    image: percona/mongodb_exporter:0.40
+    container_name: infra-mongodb-exporter
+    restart: always
+    environment:
+      MONGODB_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/admin  # URI de connexion à MongoDB
+    ports:
+      - "9216:9216"  # Port HTTP du exporter
+    depends_on:
+      - mongodb
+    networks:
+      - infra-net
+
+  # 🧭 mongo-express — Interface Web pour administrer MongoDB (comme pgAdmin)
+  mongo_express:
+    image: mongo-express:1.0.2
+    container_name: infra-mongo-express
+    restart: always
+    ports:
+      - "8083:8081"  # Interface web : http://localhost:8083
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}  # Utilisateur admin MongoDB (depuis .env)
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}  # Mot de passe admin MongoDB (depuis .env)
+      ME_CONFIG_MONGODB_SERVER: mongodb  # Le nom du conteneur MongoDB
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER}  # Authentification interface web
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+    depends_on:
+      - mongodb
+    networks:
+      - infra-net
+
+  # 📊 Mongo Express (version 5) — pour administrer MongoDB 5
+  mongo_express5:
+    image: mongo-express:1.0.2
+    container_name: infra-mongo-express5
+    restart: always
+    ports:
+      - "8084:8081"  # Interface Web MongoDB5 : http://localhost:8084
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO5_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO5_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_SERVER: mongodb5
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO5_EXPRESS_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO5_EXPRESS_PASSWORD}
+    depends_on:
+      - mongodb5
+    networks:
+      - infra-net
+
+  # 📡 Prometheus — Outil de collecte des métriques
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: infra-prometheus
+    restart: always
+    volumes:
+      - prometheus_data:/prometheus           # Données de Prometheus (stockage de séries temporelles)
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml  # Configuration avec jobs (MongoDB, cAdvisor, etc.)
+    ports:
+      - "9090:9090"  # Interface Web Prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    networks:
+      - infra-net
+
+  # 📈 Grafana — Visualisation des métriques collectées via Prometheus
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: infra-grafana
+    restart: always
+    ports:
+      - "3000:3000"  # Interface Web Grafana
+    volumes:
+      - grafana_data:/var/lib/grafana  # Stockage persistant des dashboards et config
+      - ./grafana/provisioning:/etc/grafana/provisioning  # Provisionnement automatique (datasources & dashboards)
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}       # Utilisateur admin Grafana (depuis .env)
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}  # Mot de passe admin Grafana (depuis .env)
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
     networks:
       - infra-net
 
@@ -238,4 +373,34 @@ volumes:
     driver_opts:
       type: none
       device: ${PWD}/docker/volumes/traefik_letsencrypt
+      o: bind
+  jenkins_home:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/jenkins_home
+      o: bind
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/mongodb_data
+      o: bind
+  mongodb5_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/mongodb5_data
+      o: bind
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/prometheus_data
+      o: bind
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/grafana_data
       o: bind

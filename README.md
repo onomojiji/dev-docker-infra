@@ -1,62 +1,78 @@
+# 📘 README — Infrastructure de Développement
+
+@ Fait avec le ❤️
+👤 Auteur : **onomojiji**
+📝 Licence : [MIT License](https://opensource.org/licenses/MIT)
+
+---
+
 # 📦 Infrastructure de Développement Localisée avec Docker Compose
 
-Cette infrastructure vous fournit une stack complète pour le développement logiciel moderne avec des services prêts à l'emploi : base de données, outils de monitoring, stockage objet, CI/CD, hébergement Git, messagerie, etc.
+Cette infrastructure fournit une stack complète pour le développement logiciel moderne : base de données, ERP, monitoring, stockage objet, CI/CD, hébergement Git, messagerie, visualisation de métriques, reverse proxy dynamique, etc.
 
 ---
 
 ## 🔧 Services Inclus
 
-| Service       | Rôle                                                        | Accès                                             |
-|---------------|-------------------------------------------------------------|---------------------------------------------------|
-| PostgreSQL    | Base de données relationnelle                              | `localhost:5432` (user: `devuser`, pass: `devpass`) |
-| pgAdmin       | UI Web pour PostgreSQL                                     | [http://localhost:5050](http://localhost:5050) (admin@infra.local / admin123) |
-| Odoo 18       | ERP open-source pour tests et développement                | [http://localhost:8069](http://localhost:8069) |
-| MailDev       | SMTP fake + boîte mail web                                 | [http://localhost:1080](http://localhost:1080) |
-| Redis         | Cache/messaging, utile pour Odoo et Celery                 | `localhost:6379` |
-| Adminer       | Interface SQL légère                                       | [http://localhost:8080](http://localhost:8080) |
-| Portainer     | UI de gestion Docker containers                            | [http://localhost:9000](http://localhost:9000) |
-| MinIO         | Serveur de stockage S3 compatible                          | [http://localhost:9001](http://localhost:9001) (minioadmin / minioadmin123) |
-| Elasticsearch | Moteur de recherche / indexation                           | [http://localhost:9200](http://localhost:9200) |
-| Kibana        | UI de visualisation pour Elasticsearch                     | [http://localhost:5601](http://localhost:5601) |
-| RabbitMQ      | Broker de message pour communication entre services        | [http://localhost:15672](http://localhost:15672) (admin / admin123) |
-| Jenkins       | Intégration continue (CI/CD)                               | [http://localhost:8081](http://localhost:8081) |
-| Gitea         | Hébergement Git auto-hébergé                               | [http://localhost:3000](http://localhost:3000) |
-| Grafana       | Dashboard et visualisation de métriques                    | [http://localhost:3001](http://localhost:3001) |
-| Prometheus    | Collecteur de métriques compatible Grafana                 | [http://localhost:9090](http://localhost:9090) |
-| Logstash      | Ingesteur de logs pour Elasticsearch                       | Entrée log à configurer sur `5044` |
-| Traefik       | Reverse proxy dynamique avec gestion HTTPS automatique     | [http://localhost:8088/dashboard/](http://localhost:8088/dashboard/) |
+| Service        | Rôle                                        | Accès                                                                             |
+| -------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
+| PostgreSQL     | Base de données relationnelle               | `postgres:5432` (user: `devuser`, pass: `devpass`)                                |
+| pgAdmin        | UI Web pour PostgreSQL                      | [http://localhost:5050](http://localhost:5050) (`pgadmin@dev.com` / `pgadmin123`) |
+| Odoo 18        | ERP open-source pour tests et développement | [http://localhost:8069](http://localhost:8069)                                    |
+| MinIO          | Stockage objet S3 compatible                | [http://localhost:9001](http://localhost:9001) (`minioadmin` / `minioadmin123`)   |
+| RabbitMQ       | Message broker pour file d'attente          | [http://localhost:15672](http://localhost:15672) (`admin` / `admin123`)           |
+| MongoDB 7      | Base de données NoSQL                       | `mongodb:27017`                                                                   |
+| MongoDB 5      | Instance MongoDB rétrocompatible            | `mongodb5:27017`                                                                  |
+| Mongo Express  | UI Web pour MongoDB 7                       | [http://localhost:8083](http://localhost:8083) (`admin` / `admin`)                |
+| Mongo Express5 | UI Web pour MongoDB 5                       | [http://localhost:8084](http://localhost:8084) (`admin` / `admin`)                |
+| Jenkins        | CI/CD pipeline automation                   | [http://localhost:8081](http://localhost:8081)                                    |
+| Gitea          | Serveur Git auto-hébergé                    | [http://localhost:3000](http://localhost:3000)                                    |
+| Elasticsearch  | Moteur de recherche et indexation           | [http://localhost:9200](http://localhost:9200)                                    |
+| Kibana         | Visualisation des données Elasticsearch     | [http://localhost:5601](http://localhost:5601)                                    |
+| Grafana        | Dashboard de monitoring                     | [http://localhost:3001](http://localhost:3001) (`admin` / `grafanaadmin123`)      |
+| Prometheus     | Collecte de métriques                       | [http://localhost:9090](http://localhost:9090)                                    |
+| Logstash       | Collecteur et parseur de logs               | Entrée : port `5044`                                                              |
+| Traefik        | Reverse proxy dynamique + HTTPS             | [http://localhost:8088/dashboard/](http://localhost:8088/dashboard/)              |
 
 ---
 
-## 🔌 Connexion à partir d’un projet externe
+## 🌐 Connexion pour vos projets externes
 
-Dans vos projets Docker externes, connectez les conteneurs au réseau Docker `infra-net` en ajoutant ceci dans le `docker-compose.yml` de vos projets :
+Dans vos autres `docker-compose.yml`, ajoutez :
 
 ```yaml
 networks:
   default:
     external:
-      name: infra-net
+      name: infra-manager-infra-net
 ```
 
-Et utilisez les **noms de conteneurs** comme `postgres`, `rabbitmq`, `redis`, `minio`, etc., pour vous y connecter directement.
+Et utilisez les noms des conteneurs (`postgres`, `rabbitmq`, `mongodb`, etc.) pour s’y connecter.
 
 ---
 
-## 📊 Grafana : Visualisation des métriques
+## 📊 Grafana & Prometheus
 
-Grafana est connecté à :
-- **Prometheus** : collecte les métriques de tous les conteneurs et services
-- **PostgreSQL**, **RabbitMQ**, **Odoo** (via Prometheus exporters si ajoutés)
-- **Elasticsearch** pour logs et recherche
+### 🔌 Connecté à :
+
+* Prometheus (scraping automatique de tous les services)
+* MongoDB via `mongodb_exporter`
+* PostgreSQL, RabbitMQ, Docker, Odoo (via exporters intégrés ou personnalisés)
+
+### 🧩 Dashboards intégrés :
+
+* Docker Containers (cAdvisor)
+* PostgreSQL métriques
+* MongoDB métriques
+* Prometheus node metrics
 
 ---
 
-## 🚀 Reverse Proxy Traefik avec HTTPS
+## 🚀 Traefik : Reverse Proxy & HTTPS
 
-Traefik détecte automatiquement les services exposés sur le réseau `infra-net`.
-- Fournit des URLs dynamiques et certifiés SSL (Let's Encrypt)
-- Accès : [http://localhost:8088/dashboard/](http://localhost:8088/dashboard/)
+* Détection automatique des services exposés
+* URLs personnalisables comme `odoo.localhost`, `pgadmin.localhost`
+* Intégration Let's Encrypt automatique
 
 ---
 
@@ -66,19 +82,36 @@ Traefik détecte automatiquement les services exposés sur le réseau `infra-net
 docker compose up -d
 ```
 
-Pour voir les logs :
+### 🔎 Voir les logs :
+
 ```bash
 docker compose logs -f
 ```
 
-Pour arrêter :
+### 🛑 Arrêter :
+
 ```bash
 docker compose down
 ```
 
 ---
 
-## 🧩 À personnaliser selon vos besoins
-- Ajouter vos projets connectés à `infra-net`
-- Ajouter des exporters Prometheus pour Odoo/Redis/PostgreSQL si besoin
-- Configurer Logstash pour lire des fichiers log ou syslog
+## 🔐 Variables d’environnement
+
+Les mots de passe et utilisateurs sont définis dans le fichier `.env` :
+
+* PostgreSQL : `devuser` / `devpass`
+* MongoDB / MongoExpress : `admin` / `mongoadmin123`
+* Grafana : `admin` / `grafanaadmin123`
+* RabbitMQ : `admin` / `admin123`
+* MinIO : `minioadmin` / `minioadmin123`
+* pgAdmin : `pgadmin@dev.com` / `pgadmin123`
+
+---
+
+## 🛠️ Conseils d'utilisation
+
+* Lance `fix_odoo_permissions.sh` si Odoo signale une erreur d’écriture sur `/var/lib/odoo`
+* Connecte tous tes projets en développement à ce hub avec `infra-net`
+* Utilise Grafana et Prometheus pour surveiller tes microservices
+* Utilise Gitea ou Jenkins pour gérer ton code et CI/CD localement
