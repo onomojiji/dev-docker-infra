@@ -139,6 +139,7 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: infra-elasticsearch
+    restart: always
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false  # Désactive la sécurité (dev uniquement)
@@ -214,6 +215,31 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock         # Permet à Jenkins de lancer des conteneurs Docker
     networks:
       - infra-net
+
+  # 🔍 Gitea — Serveur Git auto-hébergé
+  gitea:
+    image: gitea/gitea:latest
+    container_name: infra-gitea
+    restart: always
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=postgres:5432
+      - GITEA__database__NAME=${GITEA_DB_NAME}
+      - GITEA__database__USER=${GITEA_DB_USER}
+      - GITEA__database__PASSWD=${GITEA_DB_PASSWORD}
+      - GITEA__server__DOMAIN=gitea.localhost
+      - GITEA__server__ROOT_URL=http://gitea.localhost:3000/
+    ports:
+      - "3000:3000"   # Interface Web
+      - "222:22"      # Accès SSH Git
+    volumes:
+      - ./docker/volumes/gitea:/data
+    networks:
+      - infra-net
+    depends_on:
+      - postgres
 
   mongodb:
     image: mongo:7
@@ -317,7 +343,7 @@ services:
     container_name: infra-grafana
     restart: always
     ports:
-      - "3000:3000"  # Interface Web Grafana
+      - "3001:3000"  # Interface Web Grafana
     volumes:
       - grafana_data:/var/lib/grafana  # Stockage persistant des dashboards et config
       - ./grafana/provisioning:/etc/grafana/provisioning  # Provisionnement automatique (datasources & dashboards)
