@@ -1,0 +1,17 @@
+{
+	"ulid": "01JZQMBH350QQ4CN45W33PX6X5",
+	"minTime": 1752055206333,
+	"maxTime": 1752062400000,
+	"stats": {
+		"numSamples": 255671,
+		"numSeries": 572,
+		"numChunks": 1730
+	},
+	"compaction": {
+		"level": 1,
+		"sources": [
+			"01JZQMBH350QQ4CN45W33PX6X5"
+		]
+	},
+	"version": 1
+}

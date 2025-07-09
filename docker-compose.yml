@@ -1,9 +1,26 @@
 # Début de la section où sont listés tous les services (conteneurs) que compose votre infrastructure.
 services:
 
+  # ☁️ OpenStack DevStack — Cluster OpenStack dans un conteneur
+  openstack-devstack:
+    image: ubuntu:22.04
+    container_name: infra-openstack-devstack
+    restart: unless-stopped
+    privileged: true  # Nécessaire pour les services système (systemd, networking, etc.)
+    volumes:
+      - openstack_devstack:/opt/devstack
+      - ./openstack/devstack.sh:/root/devstack.sh  # Script auto-exécuté
+    ports:
+      - "8087:80"  # Horizon (interface Web OpenStack)
+    environment:
+      - STACK_USER=stack
+    command: bash /root/devstack.sh
+    networks:
+      - infra-net
+
   # 🔵 Service PostgreSQL — Base de données relationnelle
   postgres:
-    image: postgres:15  # Image officielle PostgreSQL version 15
+    image: postgres:16  # Image officielle PostgreSQL version 15
     container_name: infra-postgres  # Nom du conteneur dans Docker
     restart: always  # Redémarre automatiquement si le conteneur s'arrête
     environment:
@@ -19,7 +36,7 @@ services:
 
   # 🟢 Service pgAdmin — Interface web pour gérer PostgreSQL plus facilement, comme phpMyAdmin pour MySQL.
   pgadmin:
-    image: dpage/pgadmin4  # Image officielle de pgAdmin
+    image: dpage/pgadmin4:latest  # Image officielle de pgAdmin
     container_name: infra-pgadmin
     restart: always
     environment:
@@ -364,6 +381,12 @@ networks:
 
 # 💾 Définition des volumes pour persister les données
 volumes:
+  openstack_devstack:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/docker/volumes/openstack_devstack
+      o: bind
   postgres_data:
     driver: local
     driver_opts:
