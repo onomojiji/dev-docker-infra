@@ -16,7 +16,7 @@ Cette infrastructure fournit une stack complète pour le développement logiciel
 
 | Service        | Rôle                                        | Accès                                                                             |
 | -------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
-| OpenStack     | plateforme Open Source qui permet de créer et gérer des clouds privés ou publics à partir de pools de ressources virtuelles               | `postgres:5432` (user: `admin`, pass: `admin`)                                |
+| OpenStack     | plateforme Open Source qui permet de créer et gérer des clouds privés ou publics à partir de pools de ressources virtuelles               | [http://localhost:8087](http://localhost:8087) (user: `admin`, pass: `admin`)                                |
 | pgAdmin 
 | PostgreSQL     | Base de données relationnelle               | `postgres:5432` (user: `devuser`, pass: `devpass`)                                |
 | pgAdmin        | UI Web pour PostgreSQL                      | [http://localhost:5050](http://localhost:5050) (`pgadmin@dev.com` / `pgadmin123`) |
